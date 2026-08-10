@@ -154,7 +154,10 @@ def process_folder(m, folder, dry_run):
     log.info("%s: %d correo(s) nuevo(s)", folder, len(ids))
     sent = 0
     for msg_id in ids:
-        typ, msgdata = m.fetch(msg_id, "(RFC822)")
+        # BODY.PEEK[] (a diferencia de RFC822/BODY[]) no marca \Seen como
+        # efecto secundario del fetch -- sin esto, un fallo de envío hace
+        # que el correo se dé por leído igualmente y no se reintente.
+        typ, msgdata = m.fetch(msg_id, "(BODY.PEEK[])")
         if typ != "OK" or not msgdata or not msgdata[0]:
             log.warning("No se pudo leer el mensaje %s en %s", msg_id, folder)
             continue
