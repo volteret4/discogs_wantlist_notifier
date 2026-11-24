@@ -36,7 +36,21 @@ otras columnas (estilos, ids de tracking en base64, etc.).
 ## Variables de entorno
 
 Ver `.env.example`. `IMAP_FOLDERS` va separado por `|` (no por espacio,
-los nombres de carpeta pueden contener espacios). El token/chat de
+los nombres de carpeta pueden contener espacios); por defecto `INBOX`.
+Dentro de cada carpeta solo se procesan correos `UNSEEN` de
+`noreply@discogs.com` con "Wantlist" en el asunto (`DISCOGS_FROM` /
+`DISCOGS_SUBJECT`), para no tocar el resto del INBOX ni los correos
+"Your Cart has changed" de Discogs. Si ninguna carpeta existe, el script
+sale con código 1.
+
+Historia: hasta nov-2026 se leía de `Musica.Wantlist Discogs` y
+`Musica.Wantlist Discogs.2025 02`, pero esas carpetas desaparecieron del
+buzón de disroot (solo quedan INBOX/Sent/Drafts/Junk/Trash) y el job
+dejaba de procesar nada. El 2026-11-19 volvían a existir (recreadas desde
+Thunderbird, junto con el resto de `Musica.*`) y el `.env` pasó a
+`IMAP_FOLDERS=INBOX|Musica.Wantlist Discogs|Musica.Wantlist Discogs.2025 02`,
+así que se leen tanto si las reglas del cliente mueven los correos como si no.
+El token/chat de
 Telegram pueden reutilizar el bot admin ya configurado en `bot_conciertos`
 (`ADMIN_BOT_TOKEN`/`ADMIN_CHAT_ID` en su `.env`) — son variables
 independientes aquí para poder apuntar a otro bot si se prefiere.

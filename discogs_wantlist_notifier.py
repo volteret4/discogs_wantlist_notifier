@@ -20,7 +20,12 @@ IMAP_SERVER = os.environ["IMAP_SERVER"]
 IMAP_PORT = int(os.environ.get("IMAP_PORT") or 993)
 IMAP_EMAIL = os.environ["IMAP_EMAIL"]
 IMAP_PASSWORD = os.environ["IMAP_PASSWORD"]
-IMAP_FOLDERS = [f for f in os.environ.get("IMAP_FOLDERS", "").split("|") if f]
+IMAP_FOLDERS = [f for f in os.environ.get("IMAP_FOLDERS", "INBOX").split("|") if f]
+# Filtro IMAP para quedarse solo con los correos de wantlist de Discogs: al leer
+# de INBOX hay otros correos (incluidos "Your Cart has changed" de Discogs, que
+# también llevan imágenes de i.discogs.com) que no se deben tocar.
+DISCOGS_FROM = os.environ.get("DISCOGS_FROM", "noreply@discogs.com")
+DISCOGS_SUBJECT = os.environ.get("DISCOGS_SUBJECT", "Wantlist")
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("ADMIN_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID") or os.environ.get("ADMIN_CHAT_ID", "")
@@ -140,12 +145,13 @@ def send_telegram(text):
 
 
 def process_folder(m, folder, dry_run):
+    """Devuelve el nº de ítems enviados, o None si la carpeta no existe."""
     typ = select_folder(m, folder)
     if typ != "OK":
         log.warning("No se pudo seleccionar la carpeta %s", folder)
-        return 0
+        return None
 
-    typ, data = m.search(None, "UNSEEN")
+    typ, data = m.search(None, "UNSEEN", "FROM", f'"{DISCOGS_FROM}"', "SUBJECT", f'"{DISCOGS_SUBJECT}"')
     if typ != "OK" or not data[0]:
         log.info("%s: sin correos nuevos", folder)
         return 0
@@ -205,13 +211,22 @@ def main():
     m.login(IMAP_EMAIL, IMAP_PASSWORD)
 
     total = 0
+    ok_folders = 0
     try:
         for folder in IMAP_FOLDERS:
-            total += process_folder(m, folder, args.dry_run)
+            n = process_folder(m, folder, args.dry_run)
+            if n is not None:
+                ok_folders += 1
+                total += n
     finally:
         m.logout()
 
     log.info("Total ítems procesados: %d", total)
+    if not ok_folders:
+        # Ninguna carpeta existe: fallar en voz alta en vez de terminar "bien"
+        # sin procesar nada (pasó cuando desaparecieron las carpetas Musica.*).
+        log.error("Ninguna carpeta de IMAP_FOLDERS existe en el buzón: %s", IMAP_FOLDERS)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
